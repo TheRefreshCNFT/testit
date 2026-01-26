@@ -40,7 +40,7 @@ resize();
 function addQuad(v1, v2, v3, v4, n) { quads.push({ v: [v1, v2, v3, v4], n: n }); }
 
 function buildSpiral() {
-  const height = 2500, radius = rnd(800, 1024), twists = rnd(2, 5), stacks = rnd(20, 60), sides = rnd(3, 6);
+  const height = 2200, radius = rnd(400, 800), twists = rnd(2, 5), stacks = rnd(20, 60), sides = rnd(3, 6);
   for (let i = 0; i < stacks; i++) {
     const y1 = -height/2 + (i/stacks)*height, y2 = -height/2 + ((i+1)/stacks)*height;
     const rot1 = (i/stacks)*Math.PI*2*twists, rot2 = ((i+1)/stacks)*Math.PI*2*twists;
