@@ -4,7 +4,9 @@
 <canvas id="c"></canvas>
 <script>
 /**
- * SHAPE: SPIRAL (Desktop Optimized + Smart Input)
+ * SHAPE: CUBE (Mobile & Desktop Hybrid)
+ * - Desktop: Smooth mouse, correct aspect ratio.
+ * - Mobile: Instant tilt, zoomed in for impact.
  */
 
 const CONFIG = {
@@ -17,44 +19,70 @@ const CONFIG = {
 };
 
 const canvas = c, ctx = canvas.getContext("2d", { alpha: false });
-let quads = [], hueShift = 0, targetHue = 0, sheen = 0, targetSheen = 0;
-let rotX = -0.5, rotY = 0.5, targetRotX = -0.5, targetRotY = 0.5;
-let renderScale = 1, autoRotSpeed = 0.002;
-let isDragging = false, lastX = 0, lastY = 0, dragDistance = 0;
 
+// -- STATE --
+let quads = []; 
+let hueShift = 0, targetHue = 0;       
+let sheen = 0, targetSheen = 0;          
+let rotX = -0.5, rotY = 0.5; 
+let targetRotX = -0.5, targetRotY = 0.5;
+let renderScale = 1;
+let autoRotSpeed = 0.002;
+let isDragging = false, lastX = 0, lastY = 0, dragDistance = 0;
+let inputType = 'mouse'; // 'mouse' or 'tilt'
+
+// -- MATH --
 const rnd = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
 const rndF = (min, max) => Math.random() * (max - min) + min;
 
+// -- RESIZE & SCALE --
 function resize() {
   const dpr = window.devicePixelRatio || 1;
+  // Force High Res
   canvas.width = window.innerWidth * dpr;
   canvas.height = window.innerHeight * dpr;
   canvas.style.width = "100vw";
   canvas.style.height = "100vh";
-  const minDim = Math.min(canvas.width, canvas.height);
-  renderScale = minDim / CONFIG.virtualSize; 
+  
+  const width = canvas.width;
+  const height = canvas.height;
+  const minDim = Math.min(width, height);
+  
+  // ZOOM LOGIC: 
+  // If we are on portrait (mobile), zoom in (divide by smaller number).
+  // This restores the "Big" impactful look on phones.
+  let zoomFactor = 1.0; 
+  if (width < height) zoomFactor = 0.65; // Zoom in on Mobile Portrait
+  
+  renderScale = minDim / (CONFIG.virtualSize * zoomFactor); 
 }
 window.addEventListener('resize', resize);
 resize();
 
 function addQuad(v1, v2, v3, v4, n) { quads.push({ v: [v1, v2, v3, v4], n: n }); }
 
-function buildSpiral() {
-  const height = 2200, radius = rnd(400, 800), twists = rnd(2, 5), stacks = rnd(20, 60), sides = rnd(3, 6);
-  for (let i = 0; i < stacks; i++) {
-    const y1 = -height/2 + (i/stacks)*height, y2 = -height/2 + ((i+1)/stacks)*height;
-    const rot1 = (i/stacks)*Math.PI*2*twists, rot2 = ((i+1)/stacks)*Math.PI*2*twists;
-    for (let j = 0; j < sides; j++) {
-      const ang1 = (j/sides)*Math.PI*2, ang2 = ((j+1)/sides)*Math.PI*2;
-      const p = (y, rOffset, ang) => ({ x: radius*Math.cos(ang+rOffset), y: y, z: radius*Math.sin(ang+rOffset) });
-      addQuad(p(y1, rot1, ang1), p(y1, rot1, ang2), p(y2, rot2, ang2), p(y2, rot2, ang1), {x:1, y:0, z:0});
+// -- SHAPE GENERATOR --
+function buildCube() {
+  const size = rnd(1024, 1024);
+  const div = rnd(2, 10);
+  const step = (size * 2) / div;
+  for (let i = 0; i < div; i++) {
+    for (let j = 0; j < div; j++) {
+      const x = -size + i * step, y = -size + j * step;
+      const n = x + step, m = y + step;
+      addQuad({x:x, y:y, z:size}, {x:n, y:y, z:size}, {x:n, y:m, z:size}, {x:x, y:m, z:size}, {x:0,y:0,z:1});
+      addQuad({x:n, y:y, z:-size}, {x:x, y:y, z:-size}, {x:x, y:m, z:-size}, {x:n, y:m, z:-size}, {x:0,y:0,z:-1});
+      addQuad({x:size, y:y, z:n}, {x:size, y:y, z:x}, {x:size, y:m, z:x}, {x:size, y:m, z:n}, {x:1,y:0,z:0});
+      addQuad({x:-size, y:y, z:x}, {x:-size, y:y, z:n}, {x:-size, y:m, z:n}, {x:-size, y:m, z:x}, {x:-1,y:0,z:0});
+      addQuad({x:x, y:size, z:n}, {x:n, y:size, z:n}, {x:n, y:size, z:x}, {x:x, y:size, z:x}, {x:0,y:1,z:0});
+      addQuad({x:x, y:-size, z:x}, {x:n, y:-size, z:x}, {x:n, y:-size, z:n}, {x:x, y:-size, z:n}, {x:0,y:-1,z:0});
     }
   }
 }
 
 function init() {
   quads = [];
-  buildSpiral();
+  buildCube();
   autoRotSpeed = (Math.random() > 0.5 ? 1 : -1) * rndF(0.001, 0.004);
   const noiseType = rnd(0, 2);
   const amp = rnd(10, 90);
@@ -87,8 +115,17 @@ function project(p, rx, ry) {
 function draw() {
   ctx.fillStyle = "#000";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
-  hueShift += (targetHue - hueShift) * 0.05;
-  sheen += (targetSheen - sheen) * 0.05;
+
+  // HYBRID INPUT LOGIC
+  // If tilt (mobile), update instantly for responsiveness.
+  // If mouse (desktop), smooth it out.
+  if (inputType === 'tilt') {
+      hueShift = targetHue; 
+      sheen = targetSheen;
+  } else {
+      hueShift += (targetHue - hueShift) * 0.05;
+      sheen += (targetSheen - sheen) * 0.05;
+  }
 
   if (!isDragging) { targetRotY += autoRotSpeed; }
   rotX += (targetRotX - rotX) * 0.1;
@@ -115,15 +152,18 @@ function draw() {
   for (let i = 0; i < total; i++) {
     const q = renderList[i];
     if (q.z > 2500) continue;
+
     const hue = (hueShift + (i / total) * 360) % 360;
     const sheenEffect = Math.min(CONFIG.colors.maxSheen, sheen); 
     const light = CONFIG.colors.baseLight + sheenEffect; 
+    
     const alphaFill = q.isFront ? CONFIG.colors.alphaFrontFill : CONFIG.colors.alphaBackFill; 
     const alphaStroke = q.isFront ? CONFIG.colors.alphaFrontStroke : CONFIG.colors.alphaBackStroke;
     
     ctx.strokeStyle = `hsla(${hue}, ${CONFIG.colors.satStroke}%, ${light + 10}%, ${alphaStroke})`;
     ctx.lineWidth = 2 / renderScale; 
     ctx.fillStyle = `hsla(${hue}, ${CONFIG.colors.satFill}%, ${light}%, ${alphaFill})`;
+
     ctx.beginPath();
     ctx.moveTo(q.p[0].x, q.p[0].y);
     ctx.lineTo(q.p[1].x, q.p[1].y);
@@ -137,14 +177,18 @@ function draw() {
   requestAnimationFrame(draw);
 }
 
+// -- INPUTS --
 window.addEventListener('deviceorientation', e => {
   if (e.gamma === null) return;
+  inputType = 'tilt'; // Switch mode
   targetHue = (e.gamma * 4 + 360) % 360; 
   const tilt = Math.abs(e.beta - 45); 
   targetSheen = tilt * 1.5; 
 });
+
 window.addEventListener('mousemove', e => {
     if(!isDragging) {
+        inputType = 'mouse'; // Switch mode
         targetHue = (e.clientX / window.innerWidth) * 360;
         targetSheen = (e.clientY / window.innerHeight) * 50;
     }
