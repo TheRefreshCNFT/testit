@@ -4,9 +4,8 @@
 <canvas id="c"></canvas>
 <script>
 /**
- * SHAPE: CUBE (Mobile & Desktop Hybrid)
- * - Desktop: Smooth mouse, correct aspect ratio.
- * - Mobile: Instant tilt, zoomed in for impact.
+ * SHAPE: CUBE (iOS Fixed)
+ * - Added iOS 13+ Permission Request to Click Listener.
  */
 
 const CONFIG = {
@@ -29,7 +28,7 @@ let targetRotX = -0.5, targetRotY = 0.5;
 let renderScale = 1;
 let autoRotSpeed = 0.002;
 let isDragging = false, lastX = 0, lastY = 0, dragDistance = 0;
-let inputType = 'mouse'; // 'mouse' or 'tilt'
+let inputType = 'mouse'; 
 
 // -- MATH --
 const rnd = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
@@ -38,7 +37,6 @@ const rndF = (min, max) => Math.random() * (max - min) + min;
 // -- RESIZE & SCALE --
 function resize() {
   const dpr = window.devicePixelRatio || 1;
-  // Force High Res
   canvas.width = window.innerWidth * dpr;
   canvas.height = window.innerHeight * dpr;
   canvas.style.width = "100vw";
@@ -48,11 +46,9 @@ function resize() {
   const height = canvas.height;
   const minDim = Math.min(width, height);
   
-  // ZOOM LOGIC: 
-  // If we are on portrait (mobile), zoom in (divide by smaller number).
-  // This restores the "Big" impactful look on phones.
+  // Mobile Zoom Logic
   let zoomFactor = 1.0; 
-  if (width < height) zoomFactor = 0.65; // Zoom in on Mobile Portrait
+  if (width < height) zoomFactor = 0.65; 
   
   renderScale = minDim / (CONFIG.virtualSize * zoomFactor); 
 }
@@ -116,9 +112,6 @@ function draw() {
   ctx.fillStyle = "#000";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  // HYBRID INPUT LOGIC
-  // If tilt (mobile), update instantly for responsiveness.
-  // If mouse (desktop), smooth it out.
   if (inputType === 'tilt') {
       hueShift = targetHue; 
       sheen = targetSheen;
@@ -180,7 +173,7 @@ function draw() {
 // -- INPUTS --
 window.addEventListener('deviceorientation', e => {
   if (e.gamma === null) return;
-  inputType = 'tilt'; // Switch mode
+  inputType = 'tilt'; 
   targetHue = (e.gamma * 4 + 360) % 360; 
   const tilt = Math.abs(e.beta - 45); 
   targetSheen = tilt * 1.5; 
@@ -188,7 +181,7 @@ window.addEventListener('deviceorientation', e => {
 
 window.addEventListener('mousemove', e => {
     if(!isDragging) {
-        inputType = 'mouse'; // Switch mode
+        inputType = 'mouse'; 
         targetHue = (e.clientX / window.innerWidth) * 360;
         targetSheen = (e.clientY / window.innerHeight) * 50;
     }
@@ -214,8 +207,21 @@ canvas.addEventListener('touchstart', e => startDrag(e.touches[0].clientX, e.tou
 window.addEventListener('touchmove', e => { e.preventDefault(); moveDrag(e.touches[0].clientX, e.touches[0].clientY); }, {passive: false});
 window.addEventListener('touchend', endDrag);
 
+// CLICK LISTENER WITH iOS PERMISSION REQUEST
 canvas.addEventListener('click', (e) => {
-  if (dragDistance < 10) init();
+  if (dragDistance < 10) {
+    // TARGET: iOS 13+ Devices
+    if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+      DeviceOrientationEvent.requestPermission()
+        .then(response => {
+          if (response === 'granted') {
+             // iOS will now fire the deviceorientation event
+          }
+        })
+        .catch(console.error);
+    }
+    init();
+  }
 });
 
 init();
