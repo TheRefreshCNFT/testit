@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html>
+<body style="margin:0;overflow:hidden;background:#000;cursor:grab">
+<canvas id="c"></canvas>
+<script>
+/**
+ * SHAPE: CLUSTER (Mobile & Desktop Hybrid)
+ */
+
+const CONFIG = {
+  virtualSize: 4096,
+  colors: {
+    satStroke: 95, satFill: 85, baseLight: 45, maxSheen: 40,
+    alphaFrontFill: 0.15, alphaBackFill: 0.05,
+    alphaFrontStroke: 0.8, alphaBackStroke: 0.4
+  }
+};
+
+const canvas = c, ctx = canvas.getContext("2d", { alpha: false });
+let quads = [], hueShift = 0, targetHue = 0, sheen = 0, targetSheen = 0;
+let rotX = -0.5, rotY = 0.5, targetRotX = -0.5, targetRotY = 0.5;
+let renderScale = 1, autoRotSpeed = 0.002;
+let isDragging = false, lastX = 0, lastY = 0, dragDistance = 0;
+let inputType = 'mouse';
+
+const rnd = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+const rndF = (min, max) => Math.random() * (max - min) + min;
+
+function resize() {
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = window.innerWidth * dpr;
+  canvas.height = window.innerHeight * dpr;
+  canvas.style.width = "100vw";
+  canvas.style.height = "100vh";
+  const minDim = Math.min(canvas.width, canvas.height);
+  let zoomFactor = 1.0; 
+  if (canvas.width < canvas.height) zoomFactor = 0.65; 
+  renderScale = minDim / (CONFIG.virtualSize * zoomFactor); 
+}
+window.addEventListener('resize', resize);
+resize();
+
+function addQuad(v1, v2, v3, v4, n) { quads.push({ v: [v1, v2, v3, v4], n: n }); }
+
+function buildCluster() {
+  const count = rnd(6, 15);
+  for (let k = 0; k < count; k++) {
+    const w = rnd(200, 500), h = rnd(200, 600), d = rnd(100, 300);
+    const off = {x: rndF(-700, 700), y: rndF(-700, 700), z: rndF(-700, 700)};
+    const pts = [{x:-w,y:-h,z:d}, {x:w,y:-h,z:d}, {x:w,y:h,z:d}, {x:-w,y:h,z:d}, {x:-w,y:-h,z:-d}, {x:w,y:-h,z:-d}, {x:w,y:h,z:-d}, {x:-w,y:h,z:-d}].map(p => ({x: p.x+off.x, y: p.y+off.y, z: p.z+off.z}));
+    const faces = [[0,1,2,3], [1,5,6,2], [5,4,7,6], [4,0,3,7], [3,2,6,7], [4,5,1,0]];
+    faces.forEach(f => addQuad(pts[f[0]], pts[f[1]], pts[f[2]], pts[f[3]], {x:0,y:1,z:0}));
+  }
+}
+
+function init() {
+  quads = [];
+  buildCluster();
+  autoRotSpeed = (Math.random() > 0.5 ? 1 : -1) * rndF(0.001, 0.004);
+  const noiseType = rnd(0, 2);
+  const amp = rnd(10, 90);
+  quads.forEach(q => {
+    q.v = q.v.map(v => {
+      let dx=0, dy=0, dz=0;
+      if (noiseType === 0) { dx = Math.sin(v.y * 0.005) * amp; } 
+      else if (noiseType === 1) { dx = (Math.random()-0.5) * amp; dy = (Math.random()-0.5) * amp; dz = (Math.random()-0.5) * amp; } 
+      else { 
+         const ang = v.y * 0.001 * (amp/30);
+         const nx = v.x * Math.cos(ang) - v.z * Math.sin(ang);
+         const nz = v.x * Math.sin(ang) + v.z * Math.cos(ang);
+         return {x:nx, y:v.y, z:nz};
+      }
+      return {x: v.x+dx, y: v.y+dy, z: v.z+dz};
+    });
+  });
+}
+
+function project(p, rx, ry) {
+  const x1 = p.x * Math.cos(ry) - p.z * Math.sin(ry);
+  const z1 = p.x * Math.sin(ry) + p.z * Math.cos(ry);
+  const y2 = p.y * Math.cos(rx) - z1 * Math.sin(rx);
+  const z2 = p.y * Math.sin(rx) + z1 * Math.cos(rx);
+  const fov = 3500;
+  const scale = fov / (fov - z2);
+  return { x: 2048 + x1 * scale, y: 2048 + y2 * scale, z: z2 };
+}
+
+function draw() {
+  ctx.fillStyle = "#000";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  
+  if (inputType === 'tilt') {
+      hueShift = targetHue; sheen = targetSheen;
+  } else {
+      hueShift += (targetHue - hueShift) * 0.05; sheen += (targetSheen - sheen) * 0.05;
+  }
+
+  if (!isDragging) { targetRotY += autoRotSpeed; }
+  rotX += (targetRotX - rotX) * 0.1;
+  rotY += (targetRotY - rotY) * 0.1;
+
+  const renderList = quads.map(q => {
+    const p = q.v.map(v => project(v, rotX, rotY));
+    const zDepth = (p[0].z + p[1].z + p[2].z + p[3].z) / 4;
+    const ux = p[1].x - p[0].x, uy = p[1].y - p[0].y;
+    const vx = p[3].x - p[0].x, vy = p[3].y - p[0].y;
+    const isFront = (ux * vy - uy * vx) > 0;
+    return { p, z: zDepth, isFront };
+  });
+
+  renderList.sort((a, b) => a.z - b.z);
+  const total = renderList.length;
+
+  ctx.save();
+  const offsetX = (canvas.width - CONFIG.virtualSize * renderScale) / 2;
+  const offsetY = (canvas.height - CONFIG.virtualSize * renderScale) / 2;
+  ctx.translate(offsetX, offsetY);
+  ctx.scale(renderScale, renderScale);
+
+  for (let i = 0; i < total; i++) {
+    const q = renderList[i];
+    if (q.z > 2500) continue;
+    const hue = (hueShift + (i / total) * 360) % 360;
+    const sheenEffect = Math.min(CONFIG.colors.maxSheen, sheen); 
+    const light = CONFIG.colors.baseLight + sheenEffect; 
+    const alphaFill = q.isFront ? CONFIG.colors.alphaFrontFill : CONFIG.colors.alphaBackFill; 
+    const alphaStroke = q.isFront ? CONFIG.colors.alphaFrontStroke : CONFIG.colors.alphaBackStroke;
+    
+    ctx.strokeStyle = `hsla(${hue}, ${CONFIG.colors.satStroke}%, ${light + 10}%, ${alphaStroke})`;
+    ctx.lineWidth = 2 / renderScale; 
+    ctx.fillStyle = `hsla(${hue}, ${CONFIG.colors.satFill}%, ${light}%, ${alphaFill})`;
+    ctx.beginPath();
+    ctx.moveTo(q.p[0].x, q.p[0].y);
+    ctx.lineTo(q.p[1].x, q.p[1].y);
+    ctx.lineTo(q.p[2].x, q.p[2].y);
+    ctx.lineTo(q.p[3].x, q.p[3].y);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  }
+  ctx.restore();
+  requestAnimationFrame(draw);
+}
+
+window.addEventListener('deviceorientation', e => {
+  if (e.gamma === null) return;
+  inputType = 'tilt'; targetHue = (e.gamma * 4 + 360) % 360; targetSheen = Math.abs(e.beta - 45) * 1.5; 
+});
+window.addEventListener('mousemove', e => {
+    if(!isDragging) {
+        inputType = 'mouse'; targetHue = (e.clientX / window.innerWidth) * 360; targetSheen = (e.clientY / window.innerHeight) * 50;
+    }
+});
+const startDrag = (x, y) => { isDragging = true; lastX = x; lastY = y; dragDistance = 0; document.body.style.cursor = "grabbing"; };
+const moveDrag = (x, y) => { 
+  if (!isDragging) return; 
+  const dx = x - lastX; const dy = y - lastY;
+  dragDistance += Math.abs(dx) + Math.abs(dy);
+  targetRotY += dx * 0.005; targetRotX += dy * 0.005; lastX = x; lastY = y; 
+};
+const endDrag = () => { isDragging = false; document.body.style.cursor = "grab"; };
+canvas.addEventListener('mousedown', e => startDrag(e.clientX, e.clientY));
+window.addEventListener('mousemove', e => moveDrag(e.clientX, e.clientY));
+window.addEventListener('mouseup', endDrag);
+canvas.addEventListener('touchstart', e => startDrag(e.touches[0].clientX, e.touches[0].clientY), {passive: false});
+window.addEventListener('touchmove', e => { e.preventDefault(); moveDrag(e.touches[0].clientX, e.touches[0].clientY); }, {passive: false});
+window.addEventListener('touchend', endDrag);
+canvas.addEventListener('click', (e) => { if (dragDistance < 10) init(); });
+
+init();
+draw();
+</script>
+</body>
+</html>
