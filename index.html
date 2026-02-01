@@ -29,6 +29,7 @@ let renderScale = 1;
 let autoRotSpeed = 0.002;
 let isDragging = false, lastX = 0, lastY = 0, dragDistance = 0;
 let inputType = 'mouse';
+let hoverIdleTimer = null;
 let tiltBaseGamma = null;
 let tiltBaseBeta = null;
 let tiltBaseHue = 0;
@@ -231,7 +232,10 @@ window.addEventListener('mousemove', e => {
         const nx = (e.clientX / window.innerWidth) - 0.5;
         const ny = (e.clientY / window.innerHeight) - 0.5;
         const dist = Math.min(1, Math.sqrt(nx*nx + ny*ny) * 2); // 0 center -> 1 edges
-        targetSheen = (1 - dist) * (CONFIG.colors.maxSheen * 0.55);
+        const BRIGHT = CONFIG.colors.maxSheen;
+        const PALE = CONFIG.colors.maxSheen * 0.55;
+        targetSheen = PALE + dist * (BRIGHT - PALE);
+
     }
 });
 
