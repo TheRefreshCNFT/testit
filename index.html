@@ -29,6 +29,15 @@ let renderScale = 1;
 let autoRotSpeed = 0.002;
 let isDragging = false, lastX = 0, lastY = 0, dragDistance = 0;
 let inputType = 'mouse'; 
+  const isAndroidUA = /Android/i.test(navigator.userAgent);
+const isIOSUA = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+const BRIGHT_MIN_DESKTOP = 85;
+const BRIGHT_MIN_MOBILE  = 75;
+const BRIGHT_MAX         = 95;
+
+const BETA_FADE_MULT = 1.5;
+
 
 // -- MATH --
 const rnd = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
@@ -183,8 +192,16 @@ window.addEventListener('deviceorientation', e => {
   if (e.gamma === null) return;
   inputType = 'tilt'; 
   targetHue = (e.gamma * 4 + 360) % 360; 
-  const tilt = Math.abs(e.beta - 45); 
-  targetSheen = tilt * 1.5; 
+  const betaAbs = Math.abs(e.beta); // upright is ~90 regardless of sign
+const brightMin = (isAndroidUA || isIOSUA) ? BRIGHT_MIN_MOBILE : BRIGHT_MIN_DESKTOP;
+
+// distance outside the "full bright" band around 90
+let dist = 0;
+if (betaAbs < brightMin) dist = brightMin - betaAbs;
+else if (betaAbs > BRIGHT_MAX) dist = betaAbs - BRIGHT_MAX;
+
+// full bright inside band, fade out as you leave it
+targetSheen = Math.max(0, CONFIG.colors.maxSheen - dist * BETA_FADE_MULT); 
 });
 
 window.addEventListener('mousemove', e => {
