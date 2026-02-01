@@ -46,11 +46,19 @@ function resize() {
   const height = canvas.height;
   const minDim = Math.min(width, height);
   
-  // Mobile Zoom Logic
-  let zoomFactor = 1.0; 
-  if (width < height) zoomFactor = 0.65; 
-  
-  renderScale = minDim / (CONFIG.virtualSize * zoomFactor); 
+  // Mobile Fit
+  var isAndroid = /Android/i.test(navigator.userAgent);
+  var isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+  const cssW = window.innerWidth;
+  const cssH = window.innerHeight;
+  const isPhone = Math.min(cssW, cssH) < 768 && (isAndroid || isIOS);
+
+  // zoomFactor > 1 => slightly smaller render => prevents corner clipping during rotation
+  let zoomFactor = 1.0;
+  if (isPhone) zoomFactor = (cssW < cssH) ? 1.12 : 1.20;
+
+  renderScale = minDim / (CONFIG.virtualSize * zoomFactor);
 }
 window.addEventListener('resize', resize);
 resize();
