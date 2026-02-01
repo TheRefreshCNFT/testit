@@ -28,7 +28,12 @@ let targetRotX = -0.5, targetRotY = 0.5;
 let renderScale = 1;
 let autoRotSpeed = 0.002;
 let isDragging = false, lastX = 0, lastY = 0, dragDistance = 0;
-let inputType = 'mouse'; 
+let inputType = 'mouse';
+let tiltBaseGamma = null;
+let tiltBaseBeta = null;
+let tiltBaseHue = 0;
+let tiltBaseSheen = 0;
+
 
 // -- MATH --
 const rnd = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
@@ -88,6 +93,14 @@ function init() {
   quads = [];
   buildCube();
   autoRotSpeed = (Math.random() > 0.5 ? 1 : -1) * rndF(0.001, 0.004);
+  targetHue = rndF(0, 360);
+  targetSheen = CONFIG.colors.maxSheen * 0.55;
+  hueShift = targetHue;
+  sheen = targetSheen;
+  tiltBaseGamma = null;
+  tiltBaseBeta = null;
+  tiltBaseHue = targetHue;
+  tiltBaseSheen = targetSheen;
   const noiseType = rnd(0, 2);
   const amp = rnd(10, 90);
   quads.forEach(q => {
@@ -183,8 +196,22 @@ window.addEventListener('deviceorientation', e => {
   if (e.gamma === null) return;
   inputType = 'tilt'; 
   targetHue = (e.gamma * 4 + 360) % 360; 
-  const tilt = Math.abs(e.beta - 45); 
-  targetSheen = tilt * 1.5; 
+  // First valid tilt event sets the baseline (current holding angle becomes neutral/default)
+if (tiltBaseGamma === null || tiltBaseBeta === null) {
+  tiltBaseGamma = e.gamma;
+  tiltBaseBeta = e.beta;
+  tiltBaseHue = hueShift;
+  tiltBaseSheen = CONFIG.colors.maxSheen * 0.55;
+}
+
+// Hue shifts around the baseline (returns when you return to the baseline)
+const dg = e.gamma - tiltBaseGamma;
+targetHue = (tiltBaseHue + dg * 4 + 360) % 360;
+
+// Sheen fades OUT as you move away from baseline, then fades back IN when you return
+const db = e.beta - tiltBaseBeta;
+const dev = Math.abs(db) + Math.abs(dg) * 0.75;
+targetSheen = Math.max(0, tiltBaseSheen - dev * 1.5);
 });
 
 window.addEventListener('mousemove', e => {
