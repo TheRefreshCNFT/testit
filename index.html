@@ -88,6 +88,10 @@ function init() {
   quads = [];
   buildCube();
   autoRotSpeed = (Math.random() > 0.5 ? 1 : -1) * rndF(0.001, 0.004);
+  targetHue = rndF(0, 360);
+  targetSheen = Math.min(CONFIG.colors.maxSheen, (CONFIG.colors.maxSheen * 0.35) + tilt * 1.5);
+  hueShift = targetHue;
+  sheen = targetSheen;
   const noiseType = rnd(0, 2);
   const amp = rnd(10, 90);
   quads.forEach(q => {
