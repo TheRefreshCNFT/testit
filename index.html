@@ -33,6 +33,19 @@ let tiltBaseGamma = null;
 let tiltBaseBeta = null;
 let tiltBaseHue = 0;
 let tiltBaseSheen = 0;
+const isAndroidUA = /Android/i.test(navigator.userAgent);
+const isIOSUA = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+// Brightest band around 90°
+// All devices: 85–95
+// Mobile: extend lower bound down to 75
+const BRIGHT_MIN_DESKTOP = 85;
+const BRIGHT_MIN_MOBILE  = 75;
+const BRIGHT_MAX         = 95;
+
+// How fast it fades when outside the band
+const BETA_FADE_MULT = 1.5;
+
 
 
 // -- MATH --
@@ -195,13 +208,20 @@ function draw() {
 window.addEventListener('deviceorientation', e => {
   if (e.gamma === null) return;
   inputType = 'tilt'; 
-  targetHue = (e.gamma * 4 + 360) % 360; 
-  // First valid tilt event sets the baseline (current holding angle becomes neutral/default)
-if (tiltBaseGamma === null || tiltBaseBeta === null) {
-  tiltBaseGamma = e.gamma;
-  tiltBaseBeta = e.beta;
-  tiltBaseHue = hueShift;
-  tiltBaseSheen = CONFIG.colors.maxSheen * 0.55;
+  // Hue stays driven by gamma (keeps your existing tilt color behavior)
+  targetHue = (e.gamma * 4 + 360) % 360;
+
+  // Brightness (sheen) is driven by beta around the fixed 90° band
+  const betaAbs = Math.abs(e.beta);
+  const brightMin = (isAndroidUA || isIOSUA) ? BRIGHT_MIN_MOBILE : BRIGHT_MIN_DESKTOP;
+
+  // Distance outside the "full color" band
+  let dist = 0;
+  if (betaAbs < brightMin) dist = brightMin - betaAbs;
+  else if (betaAbs > BRIGHT_MAX) dist = betaAbs - BRIGHT_MAX;
+
+  // Full color inside band, fade out as you move away, fade back in as you return
+  targetSheen = Math.max(0, tiltBaseSheen - dist * BETA_FADE_MULT);
 }
 
 // Hue shifts around the baseline (returns when you return to the baseline)
