@@ -28,27 +28,7 @@ let targetRotX = -0.5, targetRotY = 0.5;
 let renderScale = 1;
 let autoRotSpeed = 0.002;
 let isDragging = false, lastX = 0, lastY = 0, dragDistance = 0;
-let inputType = 'mouse';
-let hoverIdleTimer = null;
-let tiltBaseGamma = null;
-let tiltBaseBeta = null;
-let tiltBaseHue = 0;
-let tiltBaseSheen = 0;
-const isAndroidUA = /Android/i.test(navigator.userAgent);
-const isIOSUA = /iPhone|iPad|iPod/i.test(navigator.userAgent);
-
-// Brightest band around 90°
-// All devices: 85–95
-// Mobile: extend lower bound down to 75
-const BRIGHT_MAX_DESKTOP = 180;   // 0..5 is full bright
-const BRIGHT_MAX_MOBILE  = 195;  // 0..15 is full bright on mobile
-
-  const brightMax = (isAndroidUA || isIOSUA) ? BRIGHT_MAX_MOBILE : BRIGHT_MAX_DESKTOP;
-
-// How fast it fades when outside the band
-const BETA_FADE_MULT = 1.5;
-
-
+let inputType = 'mouse'; 
 
 // -- MATH --
 const rnd = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
@@ -108,14 +88,6 @@ function init() {
   quads = [];
   buildCube();
   autoRotSpeed = (Math.random() > 0.5 ? 1 : -1) * rndF(0.001, 0.004);
-  targetHue = rndF(0, 360);
-  targetSheen = CONFIG.colors.maxSheen;
-  hueShift = targetHue;
-  sheen = targetSheen;
-  tiltBaseGamma = null;
-  tiltBaseBeta = null;
-  tiltBaseHue = targetHue;
-  tiltBaseSheen = targetSheen;
   const noiseType = rnd(0, 2);
   const amp = rnd(10, 90);
   quads.forEach(q => {
@@ -210,35 +182,16 @@ function draw() {
 window.addEventListener('deviceorientation', e => {
   if (e.gamma === null) return;
   inputType = 'tilt'; 
-  // Hue stays driven by gamma (keeps your existing tilt color behavior)
-  targetHue = (e.gamma * 4 + 360) % 360;
-
-  // Brightness (sheen) is driven by beta around the fixed 90° band
-  const betaAbs = Math.abs(e.beta);
-  const brightMin = (isAndroidUA || isIOSUA) ? BRIGHT_MIN_MOBILE : BRIGHT_MIN_DESKTOP;
-
-  
-      // Distance outside the "full color" band
-  let dist = 0;
-  if (betaAbs < brightMin) dist = brightMin - betaAbs;
-  else if (betaAbs > BRIGHT_MAX) dist = betaAbs - BRIGHT_MAX;
-
-
-  // Full color inside band, fade out as you move away, fade back in as you return
-  targetSheen = Math.max(0, tiltBaseSheen - dist * BETA_FADE_MULT);
+  targetHue = (e.gamma * 4 + 360) % 360; 
+  const tilt = Math.abs(e.beta - 45); 
+  targetSheen = tilt * 1.5; 
 });
 
 window.addEventListener('mousemove', e => {
     if(!isDragging) {
         inputType = 'mouse'; 
         targetHue = (e.clientX / window.innerWidth) * 360;
-        const nx = (e.clientX / window.innerWidth) - 0.5;
-        const ny = (e.clientY / window.innerHeight) - 0.5;
-        const dist = Math.min(1, Math.sqrt(nx*nx + ny*ny) * 2); // 0 center -> 1 edges
-        const BRIGHT = CONFIG.colors.maxSheen;
-        const PALE = CONFIG.colors.maxSheen * 0.55;
-        targetSheen = PALE + dist * (BRIGHT - PALE);
-
+        targetSheen = (e.clientY / window.innerHeight) * 50;
     }
 });
 
