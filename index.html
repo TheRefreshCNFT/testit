@@ -224,16 +224,6 @@ window.addEventListener('deviceorientation', e => {
   targetSheen = Math.max(0, tiltBaseSheen - dist * BETA_FADE_MULT);
 });
 
-// Hue shifts around the baseline (returns when you return to the baseline)
-const dg = e.gamma - tiltBaseGamma;
-targetHue = (tiltBaseHue + dg * 4 + 360) % 360;
-
-// Sheen fades OUT as you move away from baseline, then fades back IN when you return
-const db = e.beta - tiltBaseBeta;
-const dev = Math.abs(db) + Math.abs(dg) * 0.75;
-targetSheen = Math.max(0, tiltBaseSheen - dev * 1.5);
-});
-
 window.addEventListener('mousemove', e => {
     if(!isDragging) {
         inputType = 'mouse'; 
