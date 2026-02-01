@@ -22,7 +22,8 @@ const canvas = c, ctx = canvas.getContext("2d", { alpha: false });
 // -- STATE --
 let quads = []; 
 let hueShift = 0, targetHue = 0;       
-let sheen = 0, targetSheen = 0;          
+// Start at maxSheen so it loads "perfect" immediately
+let sheen = 40, targetSheen = 40;          
 let rotX = -0.5, rotY = 0.5; 
 let targetRotX = -0.5, targetRotY = 0.5;
 let renderScale = 1;
@@ -33,9 +34,9 @@ let inputType = 'mouse';
 const isIOSUA = /iPhone|iPad|iPod/i.test(navigator.userAgent);
 
 const BRIGHT_MIN_DESKTOP = 85;
-const BRIGHT_MIN_MOBILE  = 85;  // 90 - 5% (5 deg forward)
+const BRIGHT_MIN_MOBILE  = 90;  // 90 - 5% (5 deg forward)
 const BRIGHT_MAX_DESKTOP = 90;
-const BRIGHT_MAX_MOBILE  = 100; // 90 + 10% (10 deg backward);
+const BRIGHT_MAX_MOBILE  = 105; // 90 + 10% (10 deg backward);
 
 const BETA_FADE_MULT = 1.5;
 
@@ -193,13 +194,13 @@ window.addEventListener('deviceorientation', e => {
   if (e.gamma === null) return;
   inputType = 'tilt'; 
   targetHue = (e.gamma * 4 + 360) % 360; 
-  const betaAbs = Math.abs(e.beta); // upright is ~90
+  const betaAbs = Math.abs(e.beta); // upright is ~90 regardless of sign
   
   const isMobile = isAndroidUA || isIOSUA;
   const min = isMobile ? BRIGHT_MIN_MOBILE : BRIGHT_MIN_DESKTOP;
   const max = isMobile ? BRIGHT_MAX_MOBILE : BRIGHT_MAX_DESKTOP;
 
-  // distance outside the "full bright" range
+  // distance outside the "full bright" band
   let dist = 0;
   if (betaAbs < min) dist = min - betaAbs;
   else if (betaAbs > max) dist = betaAbs - max;
