@@ -107,7 +107,7 @@ function init() {
   buildCube();
   autoRotSpeed = (Math.random() > 0.5 ? 1 : -1) * rndF(0.001, 0.004);
   targetHue = rndF(0, 360);
-  targetSheen = CONFIG.colors.maxSheen * 0.55;
+  targetSheen = CONFIG.colors.maxSheen;
   hueShift = targetHue;
   sheen = targetSheen;
   tiltBaseGamma = null;
@@ -228,7 +228,10 @@ window.addEventListener('mousemove', e => {
     if(!isDragging) {
         inputType = 'mouse'; 
         targetHue = (e.clientX / window.innerWidth) * 360;
-        targetSheen = (e.clientY / window.innerHeight) * 50;
+        const nx = (e.clientX / window.innerWidth) - 0.5;
+        const ny = (e.clientY / window.innerHeight) - 0.5;
+        const dist = Math.min(1, Math.sqrt(nx*nx + ny*ny) * 2); // 0 center -> 1 edges
+        targetSheen = (1 - dist) * (CONFIG.colors.maxSheen * 0.55);
     }
 });
 
