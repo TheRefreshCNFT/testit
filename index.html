@@ -222,7 +222,7 @@ window.addEventListener('deviceorientation', e => {
 
   // Full color inside band, fade out as you move away, fade back in as you return
   targetSheen = Math.max(0, tiltBaseSheen - dist * BETA_FADE_MULT);
-}
+});
 
 // Hue shifts around the baseline (returns when you return to the baseline)
 const dg = e.gamma - tiltBaseGamma;
