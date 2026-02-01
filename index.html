@@ -20,24 +20,21 @@ const CONFIG = {
 const canvas = c, ctx = canvas.getContext("2d", { alpha: false });
 
 // -- STATE --
+// -- STATE --
 let quads = []; 
-let hueShift = 0, targetHue = 0;       
+let hueShift = 0, targetHue = 0;        
 // Start at maxSheen so it loads "perfect" immediately
-let sheen = 40, targetSheen = 40;          
-let rotX = -0.5, rotY = 0.5; 
+let sheen = 40, targetSheen = 40;
+let startBeta = null; // New variable to capture initial angle
+let rotX = -0.5, rotY = 0.5;
+
 let targetRotX = -0.5, targetRotY = 0.5;
 let renderScale = 1;
 let autoRotSpeed = 0.002;
 let isDragging = false, lastX = 0, lastY = 0, dragDistance = 0;
 let inputType = 'mouse'; 
-  const isAndroidUA = /Android/i.test(navigator.userAgent);
+const isAndroidUA = /Android/i.test(navigator.userAgent);
 const isIOSUA = /iPhone|iPad|iPod/i.test(navigator.userAgent);
-
-const BRIGHT_MIN_DESKTOP = 85;
-const BRIGHT_MIN_MOBILE  = 95  // 90 - 5% (5 deg forward)
-const BRIGHT_MAX_DESKTOP = 90;
-const BRIGHT_MAX_MOBILE  = 80; // 90 + 10% (10 deg backward);
-
 const BETA_FADE_MULT = 1.5;
 
 
@@ -194,18 +191,28 @@ window.addEventListener('deviceorientation', e => {
   if (e.gamma === null) return;
   inputType = 'tilt'; 
   targetHue = (e.gamma * 4 + 360) % 360; 
-  const betaAbs = Math.abs(e.beta); // upright is ~90 regardless of sign
   
-  const isMobile = isAndroidUA || isIOSUA;
-  const min = isMobile ? BRIGHT_MIN_MOBILE : BRIGHT_MIN_DESKTOP;
-  const max = isMobile ? BRIGHT_MAX_MOBILE : BRIGHT_MAX_DESKTOP;
+  // Normalize beta (0 flat, 90 upright)
+  const currentBeta = Math.abs(e.beta);
 
-  // distance outside the "full bright" band
+  // Capture the first valid angle as the "Perfect" reference
+  if (startBeta === null && currentBeta !== 0) {
+      startBeta = currentBeta;
+  }
+
+  // If we haven't locked a start angle yet, stay bright
+  if (startBeta === null) return; 
+
+  // Define relative "Bright Zone": Start - 10 (back) to Start + 5 (forward)
+  const min = startBeta - 10;
+  const max = startBeta + 5;
+
+  // Calculate distance from the Bright Zone
   let dist = 0;
-  if (betaAbs < min) dist = min - betaAbs;
-  else if (betaAbs > max) dist = betaAbs - max;
+  if (currentBeta < min) dist = min - currentBeta;
+  else if (currentBeta > max) dist = currentBeta - max;
 
-  // full bright inside band, fade out as you leave it
+  // Fade based on distance
   targetSheen = Math.max(0, CONFIG.colors.maxSheen - dist * BETA_FADE_MULT); 
 });
 
