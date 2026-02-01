@@ -40,9 +40,10 @@ const isIOSUA = /iPhone|iPad|iPod/i.test(navigator.userAgent);
 // Brightest band around 90°
 // All devices: 85–95
 // Mobile: extend lower bound down to 75
-const BRIGHT_MIN_DESKTOP = 355;
-const BRIGHT_MIN_MOBILE  = 345;
-const BRIGHT_MAX         = 5;
+const BRIGHT_MAX_DESKTOP = 5;   // 0..5 is full bright
+const BRIGHT_MAX_MOBILE  = 15;  // 0..15 is full bright on mobile
+
+  const brightMax = (isAndroidUA || isIOSUA) ? BRIGHT_MAX_MOBILE : BRIGHT_MAX_DESKTOP;
 
 // How fast it fades when outside the band
 const BETA_FADE_MULT = 1.5;
@@ -217,9 +218,7 @@ window.addEventListener('deviceorientation', e => {
   const brightMin = (isAndroidUA || isIOSUA) ? BRIGHT_MIN_MOBILE : BRIGHT_MIN_DESKTOP;
 
   // Distance outside the "full color" band
-  let dist = 0;
-  if (betaAbs < brightMin) dist = brightMin - betaAbs;
-  else if (betaAbs > BRIGHT_MAX) dist = betaAbs - BRIGHT_MAX;
+    const dist = Math.max(0, betaAbs - brightMax);
 
   // Full color inside band, fade out as you move away, fade back in as you return
   targetSheen = Math.max(0, tiltBaseSheen - dist * BETA_FADE_MULT);
