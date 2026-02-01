@@ -217,8 +217,12 @@ window.addEventListener('deviceorientation', e => {
   const betaAbs = Math.abs(e.beta);
   const brightMin = (isAndroidUA || isIOSUA) ? BRIGHT_MIN_MOBILE : BRIGHT_MIN_DESKTOP;
 
-  // Distance outside the "full color" band
-    const dist = Math.max(0, betaAbs - brightMax);
+  
+      // Distance outside the "full color" band
+  let dist = 0;
+  if (betaAbs < brightMin) dist = brightMin - betaAbs;
+  else if (betaAbs > BRIGHT_MAX) dist = betaAbs - BRIGHT_MAX;
+
 
   // Full color inside band, fade out as you move away, fade back in as you return
   targetSheen = Math.max(0, tiltBaseSheen - dist * BETA_FADE_MULT);
