@@ -70,7 +70,7 @@ let zoomFactor = 1.0;
 
 if (isAndroid) {
     // Specifically tuned for Android to prevent it from appearing too small
-    zoomFactor = (cssW < cssH) ? 1.05 : 1.10; 
+    zoomFactor = (cssW < cssH) ? 1 : 1; 
 } else if (isIOS) {
     // Original scaling for iOS
     zoomFactor = (cssW < cssH) ? 1.12 : 1.20;
