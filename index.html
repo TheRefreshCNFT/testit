@@ -62,14 +62,22 @@ function resize() {
   
   // Mobile Fit
 
+const cssW = window.innerWidth;
+const cssH = window.innerHeight;
+const isPhone = Math.min(cssW, cssH) < 768 && (isAndroid || isIOS);
 
-  const cssW = window.innerWidth;
-  const cssH = window.innerHeight;
-  const isPhone = Math.min(cssW, cssH) < 768 && (isAndroid || isIOS);
+let zoomFactor = 1.0;
 
-  // zoomFactor > 1 => slightly smaller render => prevents corner clipping during rotation
-  let zoomFactor = 1.0;
-  if (isPhone) zoomFactor = (cssW < cssH) ? 1.12 : 1.20;
+if (isAndroid) {
+    // Specifically tuned for Android to prevent it from appearing too small
+    zoomFactor = (cssW < cssH) ? 1.05 : 1.10; 
+} else if (isIOS) {
+    // Original scaling for iOS
+    zoomFactor = (cssW < cssH) ? 1.12 : 1.20;
+} else if (isPhone) {
+    // Fallback for other mobile devices
+    zoomFactor = 1.12;
+}
 
   renderScale = minDim / (CONFIG.virtualSize * zoomFactor);
 }
