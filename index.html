@@ -4,7 +4,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 </head>
 <body style="margin:0;overflow:hidden;background:#000;cursor:grab">
-<canvas id="c" style="touch-action: none;"></canvas>
+<canvas id="c" style="touch-action: manipulation;"></canvas>
 <script>
 /**
  * SHAPE: CUBE (iOS Fixed)
@@ -249,15 +249,40 @@ const moveDrag = (x, y) => {
   lastX = x; 
   lastY = y; 
 };
-const endDrag = () => { isDragging = false; document.body.style.cursor = "grab"; };
+// Landmark: Add these variables above your listeners
+let lastTap = 0;
 
+const endDrag = (e) => { 
+    isDragging = false; 
+    document.body.style.cursor = "grab"; 
+
+    // Manual Double-Tap Detection
+    const now = Date.now();
+    const TIMESPAN = 300; // ms window for double tap
+    if (now - lastTap < TIMESPAN) {
+        // DOUBLE CLICK (Cancels the single click refresh)
+canvas.addEventListener('dblclick', () => {
+  if (dragDistance < 10) {
+    clearTimeout(clickTimer); // STOP the refresh from happening
+    
+    const link = document.createElement('a');
+    link.download = 'cube.png';
+    link.href = canvas.toDataURL();
+    link.click();
+  }
+});
+ // Replace this with whatever function your double-click triggers
+    }
+    lastTap = now;
+};
+
+// Update your listener to pass the event 'e'
+window.addEventListener('mouseup', e => endDrag(e));
 canvas.addEventListener('mousedown', e => startDrag(e.clientX, e.clientY));
 window.addEventListener('mousemove', e => moveDrag(e.clientX, e.clientY));
-window.addEventListener('mouseup', endDrag);
 canvas.addEventListener('touchstart', e => startDrag(e.touches[0].clientX, e.touches[0].clientY), {passive: false});
 window.addEventListener('touchmove', e => { e.preventDefault(); moveDrag(e.touches[0].clientX, e.touches[0].clientY); }, {passive: false});
-window.addEventListener('touchend', endDrag);
-
+window.addEventListener('touchend', e => endDrag(e));
 // CLICK LISTENER WITH iOS PERMISSION REQUEST
 let clickTimer = null;
 
@@ -280,17 +305,6 @@ canvas.addEventListener('click', (e) => {
   }
 });
 
-// DOUBLE CLICK (Cancels the single click refresh)
-canvas.addEventListener('dblclick', () => {
-  if (dragDistance < 10) {
-    clearTimeout(clickTimer); // STOP the refresh from happening
-    
-    const link = document.createElement('a');
-    link.download = 'cube.png';
-    link.href = canvas.toDataURL();
-    link.click();
-  }
-});
 
 
 init();
