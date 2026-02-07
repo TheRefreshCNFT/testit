@@ -4,7 +4,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 </head>
 <body style="margin:0;overflow:hidden;background:#000;cursor:grab">
-<canvas id="c" style="touch-action: manipulation;"></canvas>
+<canvas id="c" style="touch-action: none; -webkit-tap-highlight-color: transparent;"></canvas>
 <script>
 /**
  * SHAPE: CUBE (iOS Fixed)
@@ -249,62 +249,70 @@ const moveDrag = (x, y) => {
   lastX = x; 
   lastY = y; 
 };
-// Landmark: Add these variables above your listeners
+// Landmark: Variables
 let lastTap = 0;
-
-const endDrag = (e) => { 
-    isDragging = false; 
-    document.body.style.cursor = "grab"; 
-
-    // Manual Double-Tap Detection
-    const now = Date.now();
-    const TIMESPAN = 300; // ms window for double tap
-    if (now - lastTap < TIMESPAN) {
-        // DOUBLE CLICK (Cancels the single click refresh)
-canvas.addEventListener('dblclick', () => {
-  if (dragDistance < 10) {
-    clearTimeout(clickTimer); // STOP the refresh from happening
-    
-    const link = document.createElement('a');
-    link.download = 'cube.png';
-    link.href = canvas.toDataURL();
-    link.click();
-  }
-});
- // Replace this with whatever function your double-click triggers
-    }
-    lastTap = now;
-};
-
-// Update your listener to pass the event 'e'
-window.addEventListener('mouseup', e => endDrag(e));
-canvas.addEventListener('mousedown', e => startDrag(e.clientX, e.clientY));
-window.addEventListener('mousemove', e => moveDrag(e.clientX, e.clientY));
-canvas.addEventListener('touchstart', e => startDrag(e.touches[0].clientX, e.touches[0].clientY), {passive: false});
-window.addEventListener('touchmove', e => { e.preventDefault(); moveDrag(e.touches[0].clientX, e.touches[0].clientY); }, {passive: false});
-window.addEventListener('touchend', e => endDrag(e));
-// CLICK LISTENER WITH iOS PERMISSION REQUEST
 let clickTimer = null;
 
-// CLICK LISTENER (Debounced to wait for potential double-click)
-canvas.addEventListener('click', (e) => {
-  if (dragDistance < 10) {
-    // Clear any existing timer to ensure clean slate
-    if (clickTimer) clearTimeout(clickTimer);
-    
-    // Set a delay. If dblclick happens, this is canceled before it runs.
-    clickTimer = setTimeout(() => {
-        // TARGET: iOS 13+ Devices
-        if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-            DeviceOrientationEvent.requestPermission()
-            .then(response => { if (response === 'granted') { /* iOS OK */ } })
-            .catch(console.error);
-        }
-        init();
-    }, 250);
-  }
-});
+const endDrag = (e) => {
+    isDragging = false;
+    document.body.style.cursor = "grab";
 
+    // 1. Only trigger if the user didn't actually drag (keep your dragDistance logic)
+    if (dragDistance < 10) {
+        const now = Date.now();
+        const TIMESPAN = 300; // ms window for double tap
+
+        if (now - lastTap < TIMESPAN) {
+            // --- DOUBLE TAP / DOUBLE CLICK DETECTED ---
+            clearTimeout(clickTimer); // Stop the single click (init) from firing
+            
+            const link = document.createElement('a');
+            link.download = 'cube.png';
+            link.href = canvas.toDataURL();
+            link.click();
+            
+            lastTap = 0; // Reset to prevent triple-tap bugs
+        } else {
+            // --- POTENTIAL SINGLE CLICK ---
+            lastTap = now;
+            
+            // Clear any existing timer
+            if (clickTimer) clearTimeout(clickTimer);
+
+            // Set a delay to see if a second tap comes in
+            clickTimer = setTimeout(() => {
+                // TARGET: iOS Permission + init()
+                if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                    DeviceOrientationEvent.requestPermission()
+                    .then(response => { if (response === 'granted') { init(); } })
+                    .catch(console.error);
+                } else {
+                    init(); // Desktop/Android
+                }
+            }, 250); 
+        }
+    }
+};
+
+// --- Listeners: REMOVE your old 'click' and 'dblclick' listeners ---
+canvas.addEventListener('mousedown', e => startDrag(e.clientX, e.clientY));
+window.addEventListener('mousemove', e => moveDrag(e.clientX, e.clientY));
+window.addEventListener('mouseup', e => endDrag(e));
+
+canvas.addEventListener('touchstart', e => {
+    startDrag(e.touches[0].clientX, e.touches[0].clientY);
+}, {passive: false});
+
+window.addEventListener('touchmove', e => {
+    e.preventDefault(); // Critical for Android zoom/scroll prevention
+    moveDrag(e.touches[0].clientX, e.touches[0].clientY);
+}, {passive: false});
+
+window.addEventListener('touchend', e => {
+    // Prevent the "ghost click" on Android which causes multiple saves
+    if (e.cancelable) e.preventDefault(); 
+    endDrag(e);
+});
 
 
 init();
