@@ -173,7 +173,7 @@ function draw() {
     const alphaStroke = q.isFront ? CONFIG.colors.alphaFrontStroke : CONFIG.colors.alphaBackStroke;
     
     ctx.strokeStyle = `hsla(${hue}, ${CONFIG.colors.satStroke}%, ${light + 10}%, ${alphaStroke})`;
-    ctx.lineWidth = 2 / renderScale; 
+    ctx.lineWidth = 4 / renderScale; 
     ctx.fillStyle = `hsla(${hue}, ${CONFIG.colors.satFill}%, ${light}%, ${alphaFill})`;
 
     ctx.beginPath();
@@ -238,21 +238,39 @@ window.addEventListener('touchmove', e => { e.preventDefault(); moveDrag(e.touch
 window.addEventListener('touchend', endDrag);
 
 // CLICK LISTENER WITH iOS PERMISSION REQUEST
+let clickTimer = null;
+
+// CLICK LISTENER (Debounced to wait for potential double-click)
 canvas.addEventListener('click', (e) => {
   if (dragDistance < 10) {
-    // TARGET: iOS 13+ Devices
-    if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-      DeviceOrientationEvent.requestPermission()
-        .then(response => {
-          if (response === 'granted') {
-             // iOS will now fire the deviceorientation event
-          }
-        })
-        .catch(console.error);
-    }
-    init();
+    // Clear any existing timer to ensure clean slate
+    if (clickTimer) clearTimeout(clickTimer);
+    
+    // Set a delay. If dblclick happens, this is canceled before it runs.
+    clickTimer = setTimeout(() => {
+        // TARGET: iOS 13+ Devices
+        if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+            DeviceOrientationEvent.requestPermission()
+            .then(response => { if (response === 'granted') { /* iOS OK */ } })
+            .catch(console.error);
+        }
+        init();
+    }, 250);
   }
 });
+
+// DOUBLE CLICK (Cancels the single click refresh)
+canvas.addEventListener('dblclick', () => {
+  if (dragDistance < 10) {
+    clearTimeout(clickTimer); // STOP the refresh from happening
+    
+    const link = document.createElement('a');
+    link.download = 'cube.png';
+    link.href = canvas.toDataURL();
+    link.click();
+  }
+});
+
 
 init();
 draw();
