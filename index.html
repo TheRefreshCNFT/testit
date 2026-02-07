@@ -19,6 +19,9 @@ const CONFIG = {
 
 const canvas = c, ctx = canvas.getContext("2d", { alpha: false });
 
+  var isAndroid = /Android/i.test(navigator.userAgent);
+  var isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+
 // -- STATE --
 let quads = []; 
 let hueShift = 0, targetHue = 0;       
@@ -58,8 +61,7 @@ function resize() {
   const minDim = Math.min(width, height);
   
   // Mobile Fit
-  var isAndroid = /Android/i.test(navigator.userAgent);
-  var isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+
 
   const cssW = window.innerWidth;
   const cssH = window.innerHeight;
@@ -173,7 +175,15 @@ function draw() {
     const alphaStroke = q.isFront ? CONFIG.colors.alphaFrontStroke : CONFIG.colors.alphaBackStroke;
     
     ctx.strokeStyle = `hsla(${hue}, ${CONFIG.colors.satStroke}%, ${light + 10}%, ${alphaStroke})`;
-    ctx.lineWidth = 4 / renderScale; 
+    //ctx.lineWidth = 2 / renderScale;
+          if (isAndroid) {
+          ctx.lineWidth = 4 / renderScale;
+      } else if (isIOS) {
+          ctx.lineWidth = 2 / renderScale;
+
+      } else {
+          ctx.lineWidth = 2 / renderScale;
+      }
     ctx.fillStyle = `hsla(${hue}, ${CONFIG.colors.satFill}%, ${light}%, ${alphaFill})`;
 
     ctx.beginPath();
