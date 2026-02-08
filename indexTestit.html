@@ -13,11 +13,20 @@
 
 const CONFIG = {
   virtualSize: 4096,
-  colors: {
-    satStroke: 95, satFill: 85, baseLight: 45, maxSheen: 40,
-    alphaFrontFill: 0.15, alphaBackFill: 0.05,
-    alphaFrontStroke: 0.8, alphaBackStroke: 0.4
-  }
+colors: {
+  satStroke: 95, satFill: 85, baseLight: 45, maxSheen: 40,
+  alphaFrontFill: 0.15, alphaBackFill: 0.05,
+  alphaFrontStroke: 0.8, alphaBackStroke: 0.4,
+
+  // Palette taken from your SVG gradient:
+  // #f00 -> #ff0 -> #0f0 -> #0ff -> #00f -> #f0f -> #f00
+  hueStopPos: [0.3, 0.3, 0.3, 0.3, 0.3, 0.5, .6],
+  hueStops:   [  0,   60,  120,  180,  240,  300,  360],
+
+  // Optional: set >1 to repeat the palette more times across faces
+  // (shows more colors at once). Keep 1 for identical spread to now.
+  cycles: 1
+}
 };
 
 const canvas = c, ctx = canvas.getContext("2d", { alpha: false });
@@ -50,6 +59,27 @@ const BETA_FADE_MULT = 1.5;
 // -- MATH --
 const rnd = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
 const rndF = (min, max) => Math.random() * (max - min) + min;
+
+const hueFromStops = (t) => {
+  const pos = CONFIG.colors.hueStopPos;
+  const hues = CONFIG.colors.hueStops;
+
+  // clamp
+  if (t <= pos[0]) return hues[0] % 360;
+  if (t >= pos[pos.length - 1]) return hues[hues.length - 1] % 360;
+
+  // find segment
+  for (let i = 0; i < pos.length - 1; i++) {
+    const a = pos[i], b = pos[i + 1];
+    if (t >= a && t <= b) {
+      const u = (t - a) / (b - a);
+      const h = hues[i] + (hues[i + 1] - hues[i]) * u;
+      return ((h % 360) + 360) % 360;
+    }
+  }
+  return ((hues[0] % 360) + 360) % 360;
+};
+
 
 // -- RESIZE & SCALE --
 function resize() {
@@ -178,7 +208,9 @@ function draw() {
     const q = renderList[i];
     if (q.z > 2500) continue;
 
-    const hue = (hueShift + (i / total) * 360) % 360;
+    const t = (((hueShift / 360) + (i / total) * CONFIG.colors.cycles) % 1 + 1) % 1;
+    const hue = hueFromStops(t);
+
     const sheenEffect = Math.min(CONFIG.colors.maxSheen, sheen); 
     const light = CONFIG.colors.baseLight + sheenEffect; 
     
