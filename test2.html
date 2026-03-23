@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Pyramid</title>
+</head>
+<body style="margin:0;overflow:hidden;background:#000;cursor:grab">
+<canvas id="c" style="touch-action:none;-webkit-tap-highlight-color:transparent;display:block"></canvas>
+<script>
+/* Shared interaction + color system copied from CubesMin1/torus logic. Shape builder preserved. */
+
+const CONFIG={
+  t:4096,
+  o:{
+    i:95,l:85,u:45,h:40,g:.15,M:.05,S:.8,v:.4,
+    I:[0,1],
+    p:[115,285],
+    O:1
+  }
+};
+
+const canvas=document.getElementById("c");
+const ctx=canvas.getContext("2d",{alpha:false});
+
+const isAndroid=/Android/i.test(navigator.userAgent);
+const isIOS=/iPhone|iPad|iPod/i.test(navigator.userAgent);
+const isAndroidUA=isAndroid;
+const isIOSUA=isIOS;
+
+const BRIGHT_MIN_DESKTOP = 85;
+const BRIGHT_MIN_MOBILE  = 95;
+const BRIGHT_MAX_DESKTOP = 90;
+const BRIGHT_MAX_MOBILE  = 80;
+const BETA_FADE_MULT = 1.5;
+
+let quads=[];
+let hueShift=0,targetHue=0;
+let sheen=CONFIG.o.h,targetSheen=CONFIG.o.h;
+let rotX=-.5,rotY=.5,targetRotX=-.5,targetRotY=.5;
+let renderScale=1,autoRotSpeed=.002;
+
+let isDragging=false,lastX=0,lastY=0,dragDistance=0;
+let inputType="mouse";
+
+const rnd=(a,b)=>Math.floor(Math.random()*(b-a+1))+a;
+const rndF=(a,b)=>Math.random()*(b-a)+a;
+
+const hueFromStops=t=>{
+  const pos=CONFIG.o.I,hs=CONFIG.o.p;
+  if(t<=pos[0])return hs[0]%360;
+  if(t>=pos[pos.length-1])return hs[hs.length-1]%360;
+  for(let i=0;i<pos.length-1;i++){
+    const a=pos[i],b=pos[i+1];
+    if(t>=a&&t<=b){
+      const u=(t-a)/(b-a);
+      const h=hs[i]+(hs[i+1]-hs[i])*u;
+      return (h%360+360)%360;
+    }
+  }
+  return (hs[0]%360+360)%360;
+};
+
+function resize(){
+  const dpr=window.devicePixelRatio||1;
+  canvas.width=innerWidth*dpr;
+  canvas.height=innerHeight*dpr;
+  canvas.style.width="100vw";
+  canvas.style.height="100vh";
+
+  const cw=canvas.width,ch=canvas.height;
+  const minDim=Math.min(cw,ch);
+  const w=innerWidth,h=innerHeight;
+  const smallMobile=Math.min(w,h)<768&&(isAndroid||isIOS);
+
+  let c=1;
+  if(isAndroid){
+    c=w<h?1:1;
+  }else if(isIOS){
+    c=w<h?1.02:1.1;
+  }else if(smallMobile){
+    c=1.1;
+  }
+  renderScale=minDim/(CONFIG.t*c);
+}
+addEventListener("resize",resize);
+resize();
+
+function addQuad(a,b,c,d,n){quads.push({T:[a,b,c,d],n})}
+
+// --- PYRAMID SHAPE (preserved) ---
+function buildPyramid(){
+  const base=rnd(900,1200);
+  const h=rnd(900,1300);
+  const div=rnd(18,34);
+  const step=(base*2)/div;
+
+  for(let i=0;i<div;i++){
+    for(let j=0;j<div;j++){
+      const x=-base+i*step;
+      const z=-base+j*step;
+      const x2=x+step;
+      const z2=z+step;
+      addQuad({x,y:-h,z},{x:x2,y:-h,z},{x:x2,y:-h,z:z2},{x,y:-h,z:z2},{x:0,y:-1,z:0});
+    }
+  }
+
+  const top={x:0,y:h,z:0};
+  for(let i=0;i<div;i++){
+    const x=-base+i*step;
+    const x2=x+step;
+    addQuad({x,y:-h,z:-base},{x:x2,y:-h,z:-base},top,top,{x:0,y:0,z:1});
+    addQuad({x:x2,y:-h,z:base},{x,y:-h,z:base},top,top,{x:0,y:0,z:-1});
+    addQuad({x:-base,y:-h,z:x},{x:-base,y:-h,z:x2},top,top,{x:-1,y:0,z:0});
+    addQuad({x:base,y:-h,z:x2},{x:base,y:-h,z:x},top,top,{x:1,y:0,z:0});
+  }
+}
+
+function init(){
+  quads=[];
+  buildPyramid();
+  autoRotSpeed=(Math.random()>.5?1:-1)*rndF(.001,.004);
+  const mode=rnd(0,2);
+  const amp=rnd(10,90);
+
+  quads.forEach(q=>{
+    q.T=q.T.map(p=>{
+      let dx=0,dy=0,dz=0;
+      if(mode===0){
+        dx=Math.sin(p.y*.005)*amp;
+      }else if(mode===1){
+        dx=(Math.random()-.5)*amp;
+        dy=(Math.random()-.5)*amp;
+        dz=(Math.random()-.5)*amp;
+      }else{
+        const ang=p.y*.001*(amp/30);
+        const x=p.x*Math.cos(ang)-p.z*Math.sin(ang);
+        const z=p.x*Math.sin(ang)+p.z*Math.cos(ang);
+        return {x,y:p.y,z};
+      }
+      return {x:p.x+dx,y:p.y+dy,z:p.z+dz};
+    });
+  });
+  // initialize color/brightness to screen center so first frame isn't pale
+  targetHue = (innerWidth/2)/innerWidth*360;
+  targetSheen = (innerHeight/2)/innerHeight*50;
+  hueShift = targetHue;
+  sheen = targetSheen;
+}
+
+function project(p,rx,ry){
+  const x=p.x*Math.cos(ry)-p.z*Math.sin(ry);
+  const z=p.x*Math.sin(ry)+p.z*Math.cos(ry);
+  const y=p.y*Math.cos(rx)-z*Math.sin(rx);
+  const zz=p.y*Math.sin(rx)+z*Math.cos(rx);
+  const f=3500;
+  const s=f/(f-zz);
+  return {x:2048+x*s,y:2048+y*s,z:zz};
+}
+
+function draw(){
+  ctx.fillStyle="#000";
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+
+  if(inputType==="tilt"){
+    hueShift=targetHue; sheen=targetSheen;
+  }else{
+    hueShift+=(targetHue-hueShift)*.05;
+    sheen+=(targetSheen-sheen)*.05;
+  }
+
+  if(!isDragging) targetRotY+=autoRotSpeed;
+  rotX+=(targetRotX-rotX)*.1;
+  rotY+=(targetRotY-rotY)*.1;
+
+  const list=quads.map(q=>{
+    const P=q.T.map(v=>project(v,rotX,rotY));
+    const z=(P[0].z+P[1].z+P[2].z+P[3].z)/4;
+    const ax=P[1].x-P[0].x,ay=P[1].y-P[0].y;
+    const bx=P[3].x-P[0].x,by=P[3].y-P[0].y;
+    const front=ax*by-ay*bx>0;
+    return {D:P,z,F:front};
+  });
+
+  list.sort((a,b)=>a.z-b.z);
+  const N=list.length;
+
+  ctx.save();
+  const ox=(canvas.width-CONFIG.t*renderScale)/2;
+  const oy=(canvas.height-CONFIG.t*renderScale)/2;
+  ctx.translate(ox,oy);
+  ctx.scale(renderScale,renderScale);
+
+  for(let i=0;i<N;i++){
+    const q=list[i];
+    if(q.z>2500) continue;
+
+    const t=((hueShift/360+i/N*CONFIG.o.O)%1+1)%1;
+    const hue=hueFromStops(t);
+
+    const sh=Math.min(CONFIG.o.h,sheen);
+    const L=CONFIG.o.u+sh;
+
+    const aFill=q.F?CONFIG.o.g:CONFIG.o.M;
+    const aStroke=q.F?CONFIG.o.S:CONFIG.o.v;
+
+    ctx.strokeStyle=`hsla(${hue},${CONFIG.o.i}%,${L+10}%,${aStroke})`;
+    ctx.lineWidth=2/renderScale;
+    ctx.fillStyle=`hsla(${hue},${CONFIG.o.l}%,${L}%,${aFill})`;
+
+    ctx.beginPath();
+    ctx.moveTo(q.D[0].x,q.D[0].y);
+    ctx.lineTo(q.D[1].x,q.D[1].y);
+    ctx.lineTo(q.D[2].x,q.D[2].y);
+    ctx.lineTo(q.D[3].x,q.D[3].y);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  }
+
+  ctx.restore();
+  requestAnimationFrame(draw);
+}
+
+// tilt (IDENTICAL LOGIC TO YOUR REFERENCE)
+window.addEventListener("deviceorientation", e => {
+  if (e.gamma === null) return;
+  inputType = 'tilt';
+  targetHue = (e.gamma * 4 + 360) % 360;
+
+  const betaAbs = Math.abs(e.beta); // upright is ~90 regardless of sign
+
+  const isMobile = isAndroidUA || isIOSUA;
+  const min = isMobile ? BRIGHT_MIN_MOBILE : BRIGHT_MIN_DESKTOP;
+  const max = isMobile ? BRIGHT_MAX_MOBILE : BRIGHT_MAX_DESKTOP;
+
+  // distance outside the "full bright" band
+  let dist = 0;
+  if (betaAbs < min) dist = min - betaAbs;
+  else if (betaAbs > max) dist = betaAbs - max;
+
+  // full bright inside band, fade out as you leave it
+  targetSheen = Math.max(0, CONFIG.o.h - dist * BETA_FADE_MULT);
+});
+
+addEventListener("mousemove",e=>{
+  if(!isDragging){
+    inputType="mouse";
+    targetHue=e.clientX/innerWidth*360;
+    targetSheen=e.clientY/innerHeight*50;
+  }
+});
+
+const startDrag=(x,y)=>{
+  isDragging=true;
+  lastX=x; lastY=y;
+  dragDistance=0;
+  document.body.style.cursor="grabbing";
+};
+const moveDrag=(x,y)=>{
+  if(!isDragging) return;
+  const dx=x-lastX,dy=y-lastY;
+  dragDistance+=Math.abs(dx)+Math.abs(dy);
+  targetRotY+=dx*.005;
+  targetRotX+=dy*.005;
+  lastX=x; lastY=y;
+};
+
+let lastTap=0;
+let clickTimer=null;
+
+const endDrag = (e) => {
+  isDragging = false;
+  document.body.style.cursor = "grab";
+
+  if (dragDistance < 10) {
+    const now = Date.now();
+    const TIMESPAN = 300;
+
+    if (now - lastTap < TIMESPAN) {
+      // DOUBLE TAP: download
+      clearTimeout(clickTimer);
+      const link = document.createElement('a');
+      link.download = 'pyramid.png';
+      link.href = canvas.toDataURL();
+      link.click();
+      lastTap = 0;
+    } else {
+      // SINGLE TAP: wait 250ms for permission
+      lastTap = now;
+      if (clickTimer) clearTimeout(clickTimer);
+      clickTimer = setTimeout(() => {
+        if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+          DeviceOrientationEvent.requestPermission()
+            .then(response => { if (response === 'granted') { init(); } })
+            .catch(console.error);
+        } else {
+          init();
+        }
+      }, 250);
+    }
+  }
+};
+
+canvas.addEventListener("mousedown",e=>startDrag(e.clientX,e.clientY));
+addEventListener("mousemove",e=>moveDrag(e.clientX,e.clientY));
+addEventListener("mouseup",endDrag);
+
+canvas.addEventListener("touchstart",e=>{startDrag(e.touches[0].clientX,e.touches[0].clientY)},{passive:false});
+addEventListener("touchmove",e=>{e.preventDefault();moveDrag(e.touches[0].clientX,e.touches[0].clientY)},{passive:false});
+addEventListener("touchend",e=>{if(e.cancelable)e.preventDefault();endDrag(e)});
+
+init();
+draw();
+</script>
+</body>
+</html>
